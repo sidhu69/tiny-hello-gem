@@ -1,0 +1,4 @@
+project_id = "bvspizhmtdsmibmmkdlw"
+
+[functions.astrology-calculator]
+verify_jwt = false
