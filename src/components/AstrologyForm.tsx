@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, Clock, MapPin, Sparkles } from "lucide-react";
+import { Calendar, MapPin, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { TimeInput } from "./TimeInput";
 
 interface AstrologyFormProps {
   onResults: (data: any) => void;
@@ -105,20 +106,7 @@ export const AstrologyForm = ({ onResults, onLoading }: AstrologyFormProps) => {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="birthTime" className="text-lg flex items-center gap-2">
-            <Clock className="w-5 h-5 text-secondary" />
-            Birth Time
-          </Label>
-          <Input
-            id="birthTime"
-            type="time"
-            value={birthTime}
-            onChange={(e) => setBirthTime(e.target.value)}
-            className="bg-input/50 border-border/50"
-            required
-          />
-        </div>
+        <TimeInput value={birthTime} onChange={setBirthTime} />
 
         <div className="space-y-2">
           <Label htmlFor="birthPlace" className="text-lg flex items-center gap-2">
