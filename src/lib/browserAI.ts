@@ -1,26 +1,9 @@
-import { pipeline, env } from '@huggingface/transformers';
-
-// Configure transformers.js
-env.allowLocalModels = false;
-env.useBrowserCache = true;
-
-let textGenerator: any = null;
-
-export const initializeAI = async () => {
-  if (textGenerator) return textGenerator;
-  
-  console.log('Loading AI model... This may take a minute on first load.');
-  
-  // Using a small, efficient conversational model
-  textGenerator = await pipeline(
-    'text-generation',
-    'Xenova/Qwen2.5-0.5B-Instruct',
-    { device: 'webgpu' }
-  );
-  
-  console.log('AI model loaded successfully!');
-  return textGenerator;
-};
+import { 
+  calculateAspects, 
+  calculatePlanetaryStrength,
+  analyzeCareerFromChart,
+  interpretPlanetInHouse 
+} from './astrologyCalculations';
 
 export const generateAstrologyResponse = async (
   userQuestion: string,
@@ -29,46 +12,88 @@ export const generateAstrologyResponse = async (
 ) => {
   try {
     const generator = await initializeAI();
-    
-    // Build context
-    const planetsList = Object.entries(astrologyData.planets)
-      .map(([planet, data]: [string, any]) => 
-        `${planet}: ${data.sign} at ${data.degree}° in ${data.house} house`
-      )
-      .join(', ');
-    
-    const context = `You are an astrologer. Birth chart: ${astrologyData.systemType} system, Ascendant: ${astrologyData.ascendant}. Planets: ${planetsList}. 
 
-Personality: ${astrologyData.interpretations.personality}
-Relationships: ${astrologyData.interpretations.relationships}
-Career: ${astrologyData.interpretations.career}
-
-Answer briefly and clearly.`;
-
-    // Build conversation
-    let prompt = context + '\n\n';
-    conversationHistory.slice(-4).forEach(msg => {
-      prompt += `${msg.role === 'user' ? 'Question' : 'Answer'}: ${msg.content}\n`;
-    });
-    prompt += `Question: ${userQuestion}\nAnswer:`;
+    // STEP 1: Do REAL calculations
+    const aspects = calculateAspects(astrologyData.planets);
     
+    // Calculate planetary strengths
+    const planetStrengths = Object.entries(astrologyData.planets).map(
+      ([planet, pos]: [string, any]) => ({
+        planet,
+        ...calculatePlanetaryStrength(planet, pos)
+      })
+    );
+
+    // STEP 2: Generate context based on CALCULATIONS, not guesswork
+    const calculatedInsights = {
+      strongPlanets: planetStrengths.filter(p => p.strength > 70),
+      weakPlanets: planetStrengths.filter(p => p.strength < 40),
+      majorAspects: aspects.filter(a => a.orb < 3), // tight aspects are more important
+      careerAnalysis: analyzeCareerFromChart(astrologyData.planets, aspects)
+    };
+
+    // Build detailed, ACCURATE context
+    const systemContext = `You are an expert astrologer. Use ONLY the calculated data provided - do not make up interpretations.
+
+CLIENT'S CALCULATED CHART DATA:
+Ascendant: ${astrologyData.ascendant}
+
+PLANETARY STRENGTHS (calculated):
+${calculatedInsights.strongPlanets.map(p => 
+  `- ${p.planet} is ${p.dignity} in ${astrologyData.planets[p.planet].sign} (STRONG - ${p.strength}% strength)`
+).join('\n')}
+${calculatedInsights.weakPlanets.map(p => 
+  `- ${p.planet} is ${p.dignity} in ${astrologyData.planets[p.planet].sign} (WEAK - ${p.strength}% strength)`
+).join('\n')}
+
+MAJOR ASPECTS (calculated):
+${calculatedInsights.majorAspects.map(a => 
+  `- ${a.planet1} ${a.aspect} ${a.planet2} (${a.orb.toFixed(1)}° orb)`
+).join('\n')}
+
+CAREER ANALYSIS (calculated):
+${calculatedInsights.careerAnalysis}
+
+INSTRUCTIONS:
+1. Use ONLY the calculated data above when answering
+2. If asked about career, reference the Career Analysis section
+3. If asked about strengths, mention planets with Domicile or Exalted dignity
+4. If asked about challenges, mention planets in Detriment or Fall
+5. When mentioning aspects, explain their specific meaning:
+   - Conjunction (0°): Blending of energies
+   - Sextile (60°): Opportunities, easy flow
+   - Square (90°): Tension, growth through challenge  
+   - Trine (120°): Natural talents, ease
+   - Opposition (180°): Awareness through contrast
+6. Be specific with degrees and house placements
+7. Never make absolute predictions - explain potentials`;
+
+    // Rest of your AI generation code...
+    const prompt = `<|im_start|>system
+${systemContext}<|im_end|>
+<|im_start|>user
+${userQuestion}<|im_end|>
+<|im_start|>assistant
+`;
+
     const result = await generator(prompt, {
-      max_new_tokens: 300,
-      temperature: 0.7,
+      max_new_tokens: 350,
+      temperature: 0.6, // Lower temperature for more accurate, less creative responses
       do_sample: true,
-      top_p: 0.95,
+      top_p: 0.9,
+      repetition_penalty: 1.2,
     });
-    
-    // Extract the generated text
+
     let response = result[0].generated_text;
     
-    // Remove the prompt from the response
-    if (response.includes('Answer:')) {
-      const parts = response.split('Answer:');
-      response = parts[parts.length - 1].trim();
+    // Extract and clean response...
+    if (response.includes('<|im_start|>assistant')) {
+      response = response.split('<|im_start|>assistant').pop()!;
     }
-    
-    return response || "I'm analyzing your chart. Could you rephrase your question?";
+    response = response.replace(/<\|im_end\|>/g, '').trim();
+
+    return response;
+
   } catch (error) {
     console.error('AI generation error:', error);
     throw error;
