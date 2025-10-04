@@ -5,8 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Stars, Send, ArrowLeft, Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { generateAstrologyResponse, initializeAI } from "@/lib/browserAI";
 
 interface Message {
   role: "user" | "assistant";
@@ -20,6 +20,7 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,15 +35,43 @@ const Chat = () => {
       navigate("/form");
       return;
     }
-    
+
     const data = JSON.parse(storedData);
     setAstrologyData(data);
-    
-    // Add welcome message
-    setMessages([{
-      role: "assistant",
-      content: `Hey! I've got your chart ready. Your rising sign is ${data.ascendant}, and I can see some really interesting patterns here. What would you like to know about?`
-    }]);
+
+    // Initialize AI model
+    const loadAI = async () => {
+      try {
+        toast({
+          title: "Loading AI Model",
+          description: "This may take a moment on first load...",
+        });
+        
+        await initializeAI();
+        
+        setAiLoading(false);
+        
+        // Add welcome message
+        setMessages([{
+          role: "assistant",
+          content: `Hey! I've got your chart ready. Your rising sign is ${data.ascendant}, and I can see some really interesting patterns here. What would you like to know about?`
+        }]);
+        
+        toast({
+          title: "AI Ready",
+          description: "You can start asking questions now!",
+        });
+      } catch (error) {
+        console.error("AI initialization error:", error);
+        toast({
+          title: "AI Loading Failed",
+          description: "Could not load AI model. Please refresh and try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    loadAI();
   }, [navigate, toast]);
 
   useEffect(() => {
@@ -53,31 +82,39 @@ const Chat = () => {
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !astrologyData) return;
+    if (!input.trim() || !astrologyData || aiLoading) return;
 
     const userMessage: Message = { role: "user", content: input };
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
     setInput("");
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("astrology-chat", {
-        body: {
-          message: input,
-          astrologyData,
-          conversationHistory: messages,
-        },
-      });
-
-      if (error) throw error;
+      // Use browser-based AI
+      const response = await generateAstrologyResponse(
+        currentInput,
+        astrologyData,
+        messages
+      );
 
       const assistantMessage: Message = {
         role: "assistant",
-        content: data.response,
+        content: response,
       };
+      
       setMessages(prev => [...prev, assistantMessage]);
+      
     } catch (error) {
       console.error("Chat error:", error);
+      
+      // Add error message to chat
+      const errorMessage: Message = {
+        role: "assistant",
+        content: "I'm having trouble connecting to the cosmos right now. Could you try asking that again?",
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      
       toast({
         title: "Error",
         description: "Failed to get response. Please try again.",
@@ -101,7 +138,7 @@ const Chat = () => {
     <div className="min-h-screen relative overflow-hidden">
       {/* Starfield background */}
       <div className="fixed inset-0 star-field opacity-40 pointer-events-none" />
-      
+
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 py-8 h-screen flex flex-col">
         {/* Header */}
@@ -114,7 +151,7 @@ const Chat = () => {
             <ArrowLeft className="w-4 h-4" />
             New Reading
           </Button>
-          
+
           <div className="text-center">
             <div className="inline-flex items-center gap-2 mb-2">
               <Stars className="w-8 h-8 text-primary" />
@@ -124,7 +161,7 @@ const Chat = () => {
               <Sparkles className="w-6 h-6 text-accent animate-pulse" />
             </div>
             <p className="text-muted-foreground">
-              Ask anything about your life and destiny
+              {aiLoading ? "Loading AI model..." : "Ask anything about your life and destiny"}
             </p>
           </div>
         </div>
@@ -133,7 +170,20 @@ const Chat = () => {
         <Card className="flex-1 flex flex-col bg-card/50 backdrop-blur-lg border-border/50 overflow-hidden">
           <ScrollArea className="flex-1 p-6" ref={scrollRef}>
             <div className="space-y-4">
-              {messages.map((message, index) => (
+              {aiLoading && (
+                <div className="flex justify-center items-center h-full">
+                  <div className="text-center space-y-4">
+                    <div className="animate-spin inline-block">
+                      <Stars className="w-16 h-16 text-primary" />
+                    </div>
+                    <p className="text-xl text-muted-foreground">
+                      Loading AI model... This may take a minute on first load.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {!aiLoading && messages.map((message, index) => (
                 <div
                   key={index}
                   className={`flex ${
@@ -151,8 +201,8 @@ const Chat = () => {
                   </div>
                 </div>
               ))}
-              
-              {isLoading && (
+
+              {isLoading && !aiLoading && (
                 <div className="flex justify-start">
                   <div className="bg-muted rounded-lg p-4">
                     <div className="flex items-center gap-2">
@@ -174,13 +224,13 @@ const Chat = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask about your personality, career, love life..."
+                placeholder={aiLoading ? "Loading AI..." : "Ask about your personality, career, love life..."}
                 className="flex-1 bg-input/50 border-border/50"
-                disabled={isLoading}
+                disabled={isLoading || aiLoading}
               />
               <Button
                 onClick={sendMessage}
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || !input.trim() || aiLoading}
                 size="icon"
               >
                 <Send className="w-4 h-4" />
