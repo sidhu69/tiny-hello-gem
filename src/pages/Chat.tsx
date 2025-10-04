@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Stars, Send, ArrowLeft, Sparkles, Loader2 } from "lucide-react";
+import { Stars, Send, ArrowLeft, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { generateAstrologyResponse } from "@/lib/browserAI";
 
 interface Message {
   role: "user" | "assistant";
@@ -20,7 +20,6 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,38 +38,11 @@ const Chat = () => {
     const data = JSON.parse(storedData);
     setAstrologyData(data);
     
-    // Initialize AI and show welcome message
-    const initAI = async () => {
-      try {
-        setMessages([{
-          role: "assistant",
-          content: "🤖 Loading AI model... This takes ~30 seconds on first load (models are cached for future visits)"
-        }]);
-        
-        const { initializeAI } = await import("@/lib/browserAI");
-        await initializeAI();
-        
-        setMessages([{
-          role: "assistant",
-          content: `Welcome! I'm your personal AI astrologer running directly in your browser. I've analyzed your birth chart (${data.systemType === "vedic" ? "Vedic" : "Western"} system). Your ascendant is ${data.ascendant}. Ask me anything!`
-        }]);
-      } catch (error) {
-        console.error("AI initialization error:", error);
-        toast({
-          title: "AI Loading Error",
-          description: "Falling back to basic mode. Your browser may not support WebGPU.",
-          variant: "destructive",
-        });
-        setMessages([{
-          role: "assistant",
-          content: `Hello! I have your birth chart loaded. Ask me about your personality, relationships, or career based on your ${data.systemType} chart.`
-        }]);
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-    
-    initAI();
+    // Add welcome message
+    setMessages([{
+      role: "assistant",
+      content: `Hey! I've got your chart ready. Your rising sign is ${data.ascendant}, and I can see some really interesting patterns here. What would you like to know about?`
+    }]);
   }, [navigate, toast]);
 
   useEffect(() => {
@@ -81,7 +53,7 @@ const Chat = () => {
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !astrologyData || isInitializing) return;
+    if (!input.trim() || !astrologyData) return;
 
     const userMessage: Message = { role: "user", content: input };
     setMessages(prev => [...prev, userMessage]);
@@ -89,22 +61,26 @@ const Chat = () => {
     setIsLoading(true);
 
     try {
-      const response = await generateAstrologyResponse(
-        input,
-        astrologyData,
-        messages
-      );
+      const { data, error } = await supabase.functions.invoke("astrology-chat", {
+        body: {
+          message: input,
+          astrologyData,
+          conversationHistory: messages,
+        },
+      });
+
+      if (error) throw error;
 
       const assistantMessage: Message = {
         role: "assistant",
-        content: response,
+        content: data.response,
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error("Chat error:", error);
       toast({
         title: "Error",
-        description: "AI is still loading or encountered an error. Please wait and try again.",
+        description: "Failed to get response. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -198,16 +174,16 @@ const Chat = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={isInitializing ? "AI is loading..." : "Ask about your personality, career, love life..."}
+                placeholder="Ask about your personality, career, love life..."
                 className="flex-1 bg-input/50 border-border/50"
-                disabled={isLoading || isInitializing}
+                disabled={isLoading}
               />
               <Button
                 onClick={sendMessage}
-                disabled={isLoading || isInitializing || !input.trim()}
+                disabled={isLoading || !input.trim()}
                 size="icon"
               >
-                {isInitializing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                <Send className="w-4 h-4" />
               </Button>
             </div>
           </div>
