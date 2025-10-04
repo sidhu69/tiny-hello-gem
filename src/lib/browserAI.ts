@@ -14,7 +14,7 @@ export const initializeAI = async () => {
   // Using a small, efficient conversational model
   textGenerator = await pipeline(
     'text-generation',
-    'Xenova/phi-1_5_quantized',
+    'Xenova/Qwen2.5-0.5B-Instruct',
     { device: 'webgpu' }
   );
   
