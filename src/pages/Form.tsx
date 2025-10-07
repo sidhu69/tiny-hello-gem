@@ -1,17 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AstrologyForm } from "@/components/AstrologyForm";
-import { Stars, Sparkles, ArrowLeft } from "lucide-react";
+import { Stars, Sparkles, ArrowLeft, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Form = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [language, setLanguage] = useState("english");
 
   const handleResults = (data: any) => {
-    // Store astrology data in sessionStorage and navigate to chat
+    // Store astrology data and language in sessionStorage
     sessionStorage.setItem("astrologyData", JSON.stringify(data));
-    navigate("/chat");
+    sessionStorage.setItem("language", language);
+    navigate("/dashboard");
   };
 
   return (
@@ -49,6 +53,25 @@ const Form = () => {
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Enter your birth information to calculate your cosmic blueprint
           </p>
+        </div>
+
+        {/* Language Selection */}
+        <div className="max-w-2xl mx-auto mb-8">
+          <div className="bg-card/50 backdrop-blur-lg border border-border/50 rounded-lg p-6">
+            <div className="flex items-center gap-3 mb-3">
+              <Globe className="w-5 h-5 text-primary" />
+              <Label htmlFor="language" className="text-lg font-semibold">Choose Language</Label>
+            </div>
+            <Select value={language} onValueChange={setLanguage}>
+              <SelectTrigger id="language" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="english">English</SelectItem>
+                <SelectItem value="hinglish">Hinglish (हिंदी in English)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Form */}

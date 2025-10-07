@@ -7,7 +7,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SplashScreen } from "./components/SplashScreen";
 import Home from "./pages/Home";
 import Form from "./pages/Form";
+import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
+import Chart from "./pages/Chart";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,7 +30,9 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/form" element={<Form />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/chart" element={<Chart />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
