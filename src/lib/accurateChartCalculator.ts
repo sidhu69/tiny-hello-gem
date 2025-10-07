@@ -150,8 +150,9 @@ const isRetrograde = (body: Astronomy.Body, time: Astronomy.AstroTime): boolean 
   try {
     // Compare position now vs slightly in future
     const now = Astronomy.Ecliptic(Astronomy.GeoVector(body, time, true));
+    const futureTime = new Date(time.date.getTime() + 24 * 60 * 60 * 1000);
     const future = Astronomy.Ecliptic(
-      Astronomy.GeoVector(body, Astronomy.AddDays(time, 1), true)
+      Astronomy.GeoVector(body, Astronomy.MakeTime(futureTime), true)
     );
     
     let diff = future.elon - now.elon;

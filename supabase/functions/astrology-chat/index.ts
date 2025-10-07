@@ -32,8 +32,14 @@ serve(async (req) => {
 
 BIRTH CHART DATA:
 System: ${astrologyData.systemType === "vedic" ? "Vedic" : "Western"}
-Ascendant: ${astrologyData.ascendant}
+Sun Sign (birth date): ${astrologyData.planets.Sun?.sign || 'Unknown'}
+Rising Sign/Ascendant (birth time): ${astrologyData.ascendant}
 Born: ${astrologyData.birthDetails.date} at ${astrologyData.birthDetails.time} in ${astrologyData.birthDetails.place}
+
+IMPORTANT: When first greeting the user or they ask about their sign, ALWAYS clarify:
+- Their SUN SIGN is ${astrologyData.planets.Sun?.sign} (their core identity, based on birth date)
+- Their RISING SIGN is ${astrologyData.ascendant} (how they appear to others, based on birth time)
+Example: "You're a ${astrologyData.planets.Sun?.sign} Sun with ${astrologyData.ascendant} rising - so..."
 
 Planets: ${planetsList}
 
